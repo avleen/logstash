@@ -1,3 +1,4 @@
+# encoding: utf-8
 require "clamp" # gem 'clamp'
 require "logstash/errors"
 require "i18n"
@@ -107,12 +108,6 @@ class LogStash::Agent < Clamp::Command
       fail("Configuration problem.")
     end
 
-    # Stop now if we are only asking for a config test.
-    if config_test?
-      report "Configuration OK"
-      return
-    end
-
     # Make SIGINT shutdown the pipeline.
     trap_id = Stud::trap("INT") do
       @logger.warn(I18n.t("logstash.agent.interrupted"))
@@ -125,6 +120,12 @@ class LogStash::Agent < Clamp::Command
     end
 
     pipeline.configure("filter-workers", filter_workers)
+
+    # Stop now if we are only asking for a config test.
+    if config_test?
+      report "Configuration OK"
+      return
+    end
 
     @logger.unsubscribe(stdout_logs) if show_startup_errors
 
@@ -148,15 +149,17 @@ class LogStash::Agent < Clamp::Command
   def show_version
     show_version_logstash
 
-    if RUBY_PLATFORM == "java"
-      show_version_java
-      show_version_jruby
-      show_version_elasticsearch
-    end
-
-    # Was the -v or --v flag given? Show all gems, too.
     if [:info, :debug].include?(verbosity?) || debug? || verbose?
-      show_gems 
+      show_version_ruby
+
+      if RUBY_PLATFORM == "java"
+        show_version_java
+        show_version_elasticsearch
+      end
+
+      if [:debug].include?(verbosity?) || debug?
+        show_gems 
+      end
     end
   end # def show_version
 
@@ -165,12 +168,12 @@ class LogStash::Agent < Clamp::Command
     puts "logstash #{LOGSTASH_VERSION}"
   end # def show_version_logstash
 
-  def show_version_jruby
-    puts "jruby #{JRUBY_VERSION} (ruby #{RUBY_VERSION})"
-  end # def show_version_jruby
+  def show_version_ruby
+    puts RUBY_DESCRIPTION
+  end # def show_version_ruby
 
   def show_version_elasticsearch
-    # Not running in the jar, assume elasticsearch jars are
+    # Not running in the,jar? assume elasticsearch jars are
     # in ../../vendor/jar/...
     if __FILE__ !~ /^(?:jar:)?file:/
       jarpath = File.join(File.dirname(__FILE__), "../../vendor/jar/elasticsearch*/lib/*.jar")
@@ -218,8 +221,10 @@ class LogStash::Agent < Clamp::Command
       if verbosity? && verbosity?.any?
         # this is an array with length of how many times the flag is given
         if verbosity?.length == 1
+          @logger.warn("The -v flag is deprecated and will be removed in a future release. You should use --verbose instead.")
           @logger.level = :info
         else
+          @logger.warn("The -vv flag is deprecated and will be removed in a future release. You should use --debug instead.")
           @logger.level = :debug
         end
       else
@@ -266,7 +271,7 @@ class LogStash::Agent < Clamp::Command
       # aka, there must be file in path/logstash/{filters,inputs,outputs}/*.rb
       plugin_glob = File.join(path, "logstash", "{inputs,filters,outputs}", "*.rb")
       if Dir.glob(plugin_glob).empty?
-        warn(I18n.t("logstash.agent.configuration.no_plugins_found",
+        @logger.warn(I18n.t("logstash.agent.configuration.no_plugins_found",
                     :path => path, :plugin_glob => plugin_glob))
       end
 
@@ -287,6 +292,10 @@ class LogStash::Agent < Clamp::Command
     config = ""
     Dir.glob(path).sort.each do |file|
       next unless File.file?(file)
+      if file.match(/~$/)
+        @logger.debug("NOT reading config file because it is a temp file", :file => file)
+        next
+      end
       @logger.debug("Reading config file", :file => file)
       config << File.read(file) + "\n"
     end

@@ -1,3 +1,4 @@
+# encoding: utf-8
 require "logstash/filters/base"
 require "logstash/namespace"
 require "set"
@@ -33,6 +34,10 @@ require "set"
 # For example, "3.44" could be the duration of an event, so you could call it
 # simply 'duration'. Further, a string "55.3.244.1" might identify the 'client'
 # making a request.
+#
+# For the above example, your grok filter would look something like this:
+#
+# %{NUMBER:duration} %{IP:client}
 #
 # Optionally you can add a data type conversion to your grok pattern. By default
 # all semantics are saved as strings. If you wish to convert a semantic's data type,
@@ -77,7 +82,7 @@ require "set"
 # Grok sits on top of regular expressions, so any regular expressions are valid
 # in grok as well. The regular expression library is Oniguruma, and you can see
 # the full supported regexp syntax [on the Onigiruma
-# site](http://www.geocities.jp/kosako3/oniguruma/doc/RE.txt)
+# site](http://www.geocities.jp/kosako3/oniguruma/doc/RE.txt).
 #
 # #### Custom Patterns
 #
@@ -103,7 +108,7 @@ require "set"
 #
 # For example, doing the postfix queue id example as above:
 #
-#     # in ./patterns/postfix 
+#     # contents of ./patterns/postfix:
 #     POSTFIX_QUEUEID [0-9A-F]{10,11}
 #
 # Then use the `patterns_dir` setting in this plugin to tell logstash where
@@ -125,7 +130,7 @@ require "set"
 # * program: postfix/cleanup
 # * pid: 21403
 # * queue_id: BEF25A72965
-# * syslog_message: message-id=<20130101142543.5828399CCAF@mailserver14.example.com
+# * syslog_message: message-id=<20130101142543.5828399CCAF@mailserver14.example.com>
 #
 # The `timestamp`, `logsource`, `program`, and `pid` fields come from the
 # SYSLOGBASE pattern which itself is defined by other patterns.
@@ -167,8 +172,6 @@ class LogStash::Filters::Grok < LogStash::Filters::Base
 
   # Drop if matched. Note, this feature may not stay. It is preferable to combine
   # grok + grep filters to do parsing + dropping.
-  #
-  # requested in: googlecode/issue/26
   config :drop_if_match, :validate => :boolean, :default => false
 
   # Break on first match. The first successful match by grok will result in the
